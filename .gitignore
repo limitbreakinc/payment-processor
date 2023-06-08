@@ -1,14 +1,24 @@
-# Compiler files
-cache/
-out/
-
-# Ignores development broadcast logs
-!/broadcast
-/broadcast/*/31337/
-/broadcast/**/dry-run/
-
-# Docs
-docs/
-
-# Dotenv file
+node_modules
 .env
+coverage
+coverage.json
+typechain
+typechain-types
+.DS_Store
+secret.json
+
+#Hardhat files
+cache
+artifacts
+
+#Foundry files
+out/
+forge-cache/
+
+# NPM Build Output
+build
+*.tgz
+
+lcov*
+
+docs/
