@@ -19,7 +19,7 @@ contract PaymentProcessorInvariants is Test {
             coinsLocal[i] = address(coinMock);
         }
 
-        paymentProcessor = new PaymentProcessor(2_300, coinsLocal);
+        paymentProcessor = new PaymentProcessor(address(this), 2_300, coinsLocal);
 
         handler = new PaymentProcessorHandler(paymentProcessor, 5, 5, 5, 25, coinsLocal);
 

@@ -219,8 +219,10 @@ contract PaymentProcessor is ERC165, EIP712, Ownable, Pausable, IPaymentProcesso
     mapping (address => mapping (uint256 => PricingBounds)) private tokenPricingBounds;
 
     constructor(
+        address defaultContractOwner_,
         uint32 defaultPushPaymentGasLimit_, 
         address[] memory defaultPaymentMethods) EIP712("PaymentProcessor", "1") {
+
         securityPolicies[DEFAULT_SECURITY_POLICY_ID] = SecurityPolicy({
             enforceExchangeWhitelist: false,
             enforcePaymentMethodWhitelist: true,
@@ -255,6 +257,8 @@ contract PaymentProcessor is ERC165, EIP712, Ownable, Pausable, IPaymentProcesso
                 ++i;
             }
         }
+
+        _transferOwnership(defaultContractOwner_);
     }
 
     /**
