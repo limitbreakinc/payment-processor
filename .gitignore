@@ -22,3 +22,7 @@ build
 lcov*
 
 docs/
+
+.env*
+
+broadcast
