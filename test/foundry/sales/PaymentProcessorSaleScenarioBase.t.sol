@@ -67,7 +67,7 @@ contract PaymentProcessorSaleScenarioBase is Test {
         address[] memory defaultCoins = new address[](1);
         defaultCoins[0] = address(approvedPaymentCoin);
 
-        paymentProcessor = new PaymentProcessor(2_300, defaultCoins);
+        paymentProcessor = new PaymentProcessor(address(this), 2_300, defaultCoins);
         
         erc721Mock = new ERC721Mock("Test", "TEST");
         erc1155Mock = new ERC1155Mock();
