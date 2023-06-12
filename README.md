@@ -333,6 +333,10 @@ Number of Runs: 100
 
 [The Payment Processor Benchmark Test Code can be found here!](./test/foundry/gas/Benchmark.t.sol)
 
+## Audits
+
+Payment Processor was audited by Zokyo, Omniscia, and Zellic.  [Read the audit reports here](./audits/).
+
 ## License
 
 This project is released under the [MIT License](LICENSE).
