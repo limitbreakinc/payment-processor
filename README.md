@@ -337,6 +337,8 @@ Number of Runs: 100
 
 Payment Processor was audited by Zokyo, Omniscia, and Zellic.  [Read the audit reports here](./audits/).
 
-## License
+## License and Disclaimer
 
-This project is released under the [MIT License](LICENSE).
+Payment Processor is made available by Limit Break International ("Limit Break") in an effort to advance the NFT and Ethereum ecosystem (the "Payment Processor Contracts"). Limit Break is committed to following, and has sought to apply, commercially reasonable best practices as it pertains to safety and security in making Payment Processor publicly available. Nevertheless, smart contracts are a new and emerging technology and carry a high level of technical risk and uncertainty. Please report any actual or suspected security vulnerabilities to our team at security@limitbreak.com.
+
+Payment Processor made available under the [MIT License](LICENSE), which disclaims all warranties in relation to the project and which limits the liability of those that contribute and maintain the project, including Limit Break As set out further in Limit Break's [Terms of Service](https://limitbreak.com/tos.html), as may be amended and revised from time to time, you acknowledge that you are solely responsible for any use of Payment Processor Contracts and you assume all risks associated with any such use. For the avoidance of doubt, such assumption of risk by the user also implies all risks associated with the legality or related implications tied to the use of smart contracts in any given jurisdiction, whether now known or yet to be determined.
