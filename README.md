@@ -55,7 +55,20 @@ The following contracts are available for use/integration by NFT developers and 
 
 ## Contract Addresses
 
-Testnet, Mainnet, and L2 contract addresses will be provided after the contracts are audited and officially released.
+Payment Processor is deployed on the following production EVM Networks:
+
+| Network | Address                                    |
+|---------|--------------------------------------------|
+| Mainnet | 0x009a1dC629242961C9E4f089b437aFD394474cc0 |
+| Polygon | 0x009a1Daf6B5b8ADC6B3DB720C58D43caA2fdAc56 |
+
+Payment Processor is deployed on the following test EVM Networks:
+
+| Network | Address                                    |
+|---------|--------------------------------------------|
+| Goerli  | 0x009a1D88379A604664006FFf6c32877bFF6723Bd |
+| Sepolia | 0x009a1D8DE8D80Fcd9C6aaAFE97A237dC663f2978 |
+| Mumbai  | 0x009A1D6bDf55B25ca21436ED30968C1fb7648244 |
 
 ## Code Documentation
 
