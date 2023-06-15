@@ -333,6 +333,99 @@ Number of Runs: 100
 
 [The Payment Processor Benchmark Test Code can be found here!](./test/foundry/gas/Benchmark.t.sol)
 
+## Benchmarks Using Opensea's Benchmarking Framework
+
+OpenSea maintains a great [benchmarking repository](https://github.com/ProjectOpenSea/marketplace-benchmarks).  We've added payment processor to the benchmarked marketplaces.  Here are the results comparing payment processor to an expanded set of marketplaces.
+
+### Seaport
+
+| Benchmark                                                                  | Payment Processor | Seaport 1.4 | Seaport 1.1 | Difference 1.4 | Difference 1.1 |
+|----------------------------------------------------------------------------|-------------------|-------------|-------------|----------------|----------------|
+| (ERC1155 -> ERC20) Fulfill w/ Sig                                          | 106,144           | 110,146     | 111,251     | -4,002         | -5,107         |
+| (ERC1155 -> ETH) Fulfill, w/ Sig                                           | 98,318            | 101,274     | 102,621     | -2,956         | -4,303         |
+| (ERC20 -> ERC1155) Fulfill w/ Sig                                          | 106,148           | 110,190     | 111,304     | -4,042         | -5,156         |
+| (ERC20 -> ERC721) Fulfill w/ Sig                                           | 106,714           | 109,590     | 110,692     | -2,876         | -3,978         |
+| (ERC721 -> ERC20) Fulfill, w/ Sig                                          | 106,702           | 109,463     | 110,556     | -2,761         | -3,854         |
+| (ERC721 -> ETH One-Fee-Recipient) Fulfill w/ Sig                           | 127,395           | 132,821     | 134,313     | -5,426         | -6,918         |
+| (ERC721 -> ETH Two-Fee-Recipient) Fullfil /w Sig                           | 159,580           | 166,965     | 168,573     | -7,385         | -8,993         |
+| (ERC721 -> ETH) Fulfill, w/ Sig                                            | 108,872           | 109,202     | 110,528     | -330           | -1,656         |
+| (ERC721 -> WETH) Fulfill, w/ Sig                                           | 106,870           | 109,587     | 110,692     | -2,717         | -3,822         |
+| (ERC721x10 -> ERC20 Distinct Orders) Fulfill /w Sigs                       | 348,351           | 723,313     | 779,727     | -374,962       | -431,376       |
+| (ERC721x10 -> ETH (Priced Indvidually)) Fulfill /w Sig                     | 224,824           | 279,159     |             | -54,335        |                |
+| (ERC721x10 -> ETH Distinct Orders) Fulfill /w Sigs                         | 336,357           | 712,480     | 768,951     | -376,123       | -432,594       |
+| (ERC721x10 -> ETH One-Fee-Recipient (Priced Indvidually)) Fulfill /w Sig   | 298,841           | 413,087     |             | -114,246       |                |
+| (ERC721x10 -> ETH Two-Fee-Recipients (Priced Indvidually)) Fulfill /w Sig  | 331,796           | 547,047     |             | -215,251       |                |
+| (ERC721x10 -> ETH) Fulfill /w Sig                                          | 260,684           | 198,969     | 205,305     | 61,715         | 55,379         |
+| (ERC721x10 -> WETH Distinct Orders) Fulfill /w Sigs                        | 348,503           | 723,437     | 779,839     | -374,934       | -431,336       |
+| (WETH -> ERC721) Fulfill w/ Sig                                            | 106,850           | 109,726     | 110,840     | -2,876         | -3,990         |
+
+### Blur
+
+| Benchmark                                           | Payment Processor | Blur      | Difference  |
+|-----------------------------------------------------|-------------------|-----------|-------------|
+| (ERC721 -> ETH) Fulfill, w/ Sig                     | 108,872           | 260,877   | -152,005    |
+| (ERC721 -> WETH) Fulfill, w/ Sig                    | 106,870           | 213,393   | -106,523    |
+| (ERC721x10 -> ETH Distinct Orders) Fulfill /w Sigs  | 336,357           | 1,439,062 | -1,102,705  |
+| (ERC721x10 -> WETH Distinct Orders) Fulfill /w Sigs | 348,503           | 1,407,663 | -1,059,160  |
+| (WETH -> ERC721) Fulfill w/ Sig                     | 106,850           | 211,410   | -104,560    |
+
+### X2Y2
+
+| Benchmark                                            | Payment Processor | X2Y2      | Difference |
+|------------------------------------------------------|-------------------|-----------|------------|
+| (ERC20 -> ERC721) Fulfill w/ Sig                     | 106,714           | 165,477   | -58,763    |
+| (ERC721 -> ERC20) Fulfill, w/ Sig                    | 106,702           | 167,436   | -60,734    |
+| (ERC721 -> ETH One-Fee-Recipient) Fulfill w/ Sig     | 127,395           | 163,831   | -36,436    |
+| (ERC721 -> ETH Two-Fee-Recipient) Fullfil /w Sig     | 159,580           | 198,090   | -38,510    |
+| (ERC721 -> ETH) Fulfill, w/ Sig                      | 108,872           | 148,836   | -39,964    |
+| (ERC721 -> WETH) Fulfill, w/ Sig                     | 106,870           | 167,947   | -61,077    |
+| (ERC721x10 -> ERC20 Distinct Orders) Fulfill /w Sigs | 348,351           | 1,027,315 | -678,964   |
+| (ERC721x10 -> ETH Distinct Orders) Fulfill /w Sigs   | 336,357           | 786,597   | -450,240   |
+| (ERC721x10 -> ETH) Fulfill /w Sig                    | 260,684           | 208,916   | 51,768     |
+| (ERC721x10 -> WETH Distinct Orders) Fulfill /w Sigs  | 348,503           | 1,032,301 | -683,798   |
+| (WETH -> ERC721) Fulfill w/ Sig                      | 106,850           | 165,988   | -59,138    |
+
+### Looks Rare
+
+| Benchmark                                 | Payment Processor | LooksRare | Difference |
+|-------------------------------------------|-------------------|-----------|------------|
+| (WETH -> ERC721) Fulfill w/ Sig           | 106,850           | 126,264   | -19,414    |
+| (ERC721 -> WETH) Fulfill, w/ Sig          | 106,870           | 126,245   | -19,375    |
+| (ERC721 -> ETH) Fulfill, w/ Sig           | 108,872           | 189,636   | -80,764    |
+| (ERC721 -> ERC20) Fulfill, w/ Sig         | 106,702           | 126,097   | -19,395    |
+| (ERC20 -> ERC721) Fulfill w/ Sig          | 106,714           | 126,116   | -19,402    |
+| (ERC20 -> ERC1155) Fulfill w/ Sig         | 106,148           | 127,536   | -21,388    |
+| (ERC1155 -> ETH) Fulfill, w/ Sig          | 98,318            | 153,773   | -55,455    |
+| (ERC1155 -> ERC20) Fulfill w/ Sig         | 106,144           | 127,481   | -21,337    |
+
+### Sudoswap v1
+
+| Benchmark                                          | Payment Processor Gas | Sudoswap Gas | Difference   |
+|----------------------------------------------------|-----------------------|--------------|--------------|
+| (ERC721 -> ETH) Fulfill, w/ Sig                    | 108,872               | 184,272      | -75,400      |
+| (ERC721 -> ERC20) Fulfill, w/ Sig                  | 106,702               | 212,386      | -105,684     |
+| (ERC20 -> ERC721) Fulfill w/ Sig                   | 106,714               | 126,664      | -19,950      |
+| (ERC721x10 -> ETH) Fulfill w/ Sig                  | 260,684               | 734,852      | -474,168     |
+| (ERC721x10 -> ETH Distinct Orders) Fulfill w/ Sigs | 336,357               | 1,396,111    | -1,059,754   |
+
+### ZeroEx
+
+| Benchmark                                            | Payment Processor | ZeroEx   | Difference |
+|------------------------------------------------------|-------------------|----------|------------|
+| (ERC1155 -> ERC20) Fulfill w/ Sig                    | 106,144           | 110,361  | -4,217     |
+| (ERC1155 -> ETH) Fulfill, w/ Sig                     | 98,318            | 106,783  | -8,465     |
+| (ERC20 -> ERC1155) Fulfill w/ Sig                    | 106,148           | 112,969  | -6,821     |
+| (ERC20 -> ERC721) Fulfill w/ Sig                     | 106,714           | 109,374  | -2,660     |
+| (ERC721 -> ERC20) Fulfill, w/ Sig                    | 106,702           | 106,901  | -199       |
+| (ERC721 -> ETH One-Fee-Recipient) Fulfill w/ Sig     | 127,395           | 132,032  | -4,637     |
+| (ERC721 -> ETH Two-Fee-Recipient) Fullfil /w Sig     | 159,580           | 167,297  | -7,717     |
+| (ERC721 -> ETH) Fulfill, w/ Sig                      | 108,872           | 83,423   | 25,449     |
+| (ERC721 -> WETH) Fulfill, w/ Sig                     | 106,870           | 107,082  | -212       |
+| (ERC721x10 -> ERC20 Distinct Orders) Fulfill /w Sigs | 348,351           | 420,330  | -71,979    |
+| (ERC721x10 -> ETH Distinct Orders) Fulfill /w Sigs   | 336,357           | 463,314  | -126,957   |
+| (ERC721x10 -> WETH Distinct Orders) Fulfill /w Sigs  | 348,503           | 422,092  | -73,589    |
+| (WETH -> ERC721) Fulfill w/ Sig                      | 106,850           | 107,522  | -672       |
+
 ## Audits
 
 Payment Processor was audited by Zokyo, Omniscia, and Zellic.  [Read the audit reports here](./audits/).
