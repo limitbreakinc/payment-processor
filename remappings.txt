@@ -1,0 +1,10 @@
+ds-test/=lib/forge-std/lib/ds-test/src/
+forge-std/=lib/forge-std/src/
+@openzeppelin/=lib/openzeppelin-contracts/
+@rari-capital/solmate/=lib/solmate/
+murky/=lib/murky/src/
+@limitbreak/trusted-forwarder/=lib/TrustedForwarder/src/
+@limitbreak/permit-c/=lib/PermitC/src/
+@limitbreak/tm-core-lib/=lib/tm-core-lib/
+@limitbreak/wrapped-native/=lib/wrapped-native/src/
+@limitbreak/tm-role-server/=lib/tm-role-server/src/
