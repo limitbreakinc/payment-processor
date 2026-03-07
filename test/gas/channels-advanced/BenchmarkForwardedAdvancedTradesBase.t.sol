@@ -1,0 +1,3048 @@
+pragma solidity 0.8.24;
+
+import "../../modules/PaymentProcessorModuleBulkAdvanced.t.sol";
+import {MerkleTree} from "test/utils/MerkleTree.sol";
+
+contract BenchmarkForwardedAdvancedTradesBaseTest is PaymentProcessorModuleBulkAdvancedTest {
+
+    struct BenchmarkParams {
+        uint256 numRuns;
+        uint256 marketplaceFeeRate;
+        uint96 royaltyFeeRate;
+        uint96 feeOnTopRate;
+        uint16 royaltyBountyRate;
+        address currency;
+        uint160 buyerKey;
+        address beneficiary;
+    }
+
+    struct CosignedBenchmarkParams {
+        uint256 numRuns;
+        uint256 marketplaceFeeRate;
+        uint96 royaltyFeeRate;
+        uint96 feeOnTopRate;
+        uint16 royaltyBountyRate;
+        address currency;
+        uint160 buyerKey;
+        address beneficiary;
+        bool emptyCosignature;
+    }
+
+    struct BulkBenchmarkParams {
+        uint256 batchSize;
+        uint256 numRuns;
+        uint256 marketplaceFeeRate;
+        uint96 royaltyFeeRate;
+        uint96 feeOnTopRate;
+        uint16 royaltyBountyRate;
+        address currency;
+        uint160 buyerKey;
+        address beneficiary;
+    }
+
+    struct BulkCosignedBenchmarkParams {
+        uint256 batchSize;
+        uint256 numRuns;
+        uint256 marketplaceFeeRate;
+        uint96 royaltyFeeRate;
+        uint96 feeOnTopRate;
+        uint16 royaltyBountyRate;
+        address currency;
+        uint160 buyerKey;
+        address beneficiary;
+        bool emptyCosignature;
+    }
+
+    function setUp() public virtual override {
+        super.setUp();
+        
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.DefaultPaymentMethodWhitelist, 0, address(0), uint16(0), address(0), uint16(0), address(0), false, false);
+        _setCollectionPaymentSettings(address(test721Without2981), PaymentSettings.DefaultPaymentMethodWhitelist, 0, address(0), uint16(0), address(0), uint16(0), address(0), false, false);
+        _setCollectionPaymentSettings(address(test1155), PaymentSettings.DefaultPaymentMethodWhitelist, 0, address(0), uint16(0), address(0), uint16(0), address(0), false, false);
+        _setCollectionPaymentSettings(address(test1155Without2981), PaymentSettings.DefaultPaymentMethodWhitelist, 0, address(0), uint16(0), address(0), uint16(0), address(0), false, false);
+    }
+
+    /************/
+    /*  Signed  */
+    /********** */
+
+    function _runBenchmark(
+        BenchmarkParams memory params, 
+        function(BenchmarkParams memory) funcBenchmark
+    ) internal {
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkAllowAnyPaymentMethod(
+        BenchmarkParams memory params, 
+        function(BenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.AllowAnyPaymentMethod, 0, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkCustomPaymentMethodWhitelist(
+        BenchmarkParams memory params,
+        function(BenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.CustomPaymentMethodWhitelist, customPaymentMethodWhitelistId, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkCollectionLevelPricingConstraints(
+        BenchmarkParams memory params,
+        function(BenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.PricingConstraintsCollectionOnly, 0, params.currency, uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        _setCollectionPaymentSettingsCollectionPricingBounds(address(test721), PricingBounds({
+            initialized: true,
+            isSet: true,
+            floorPrice: 1 ether,
+            ceilingPrice: 500 ether
+        }), true);
+
+        
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkTokenLevelPricingConstraints(
+        BenchmarkParams memory params,
+        function(BenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.PricingConstraints, 0, params.currency, uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+
+        uint256[] memory tokenIds = new uint256[](params.numRuns);
+        PricingBounds[] memory pricingBoundsArray = new PricingBounds[](params.numRuns);
+
+        for (uint256 i = 1; i <= params.numRuns; i++) {
+            tokenIds[i - 1] = i;
+            pricingBoundsArray[i - 1] = PricingBounds({
+                initialized: true,
+                isSet: true,
+                floorPrice: 1 ether,
+                ceilingPrice: 500 ether
+            });
+        }
+
+        _setCollectionPaymentSettingsTokenPricingBounds(address(test721), tokenIds, pricingBoundsArray);
+        
+        
+        funcBenchmark(params);
+    }
+
+    /************/
+    /*  Signed - Backfilled Royalties  */
+    /********** */
+
+    function _runBenchmarkBackfilledRoyalties(
+        BenchmarkParams memory params, 
+        function(BenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721Without2981), PaymentSettings.DefaultPaymentMethodWhitelist, 0, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, true);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkAllowAnyPaymentMethodBackfilledRoyalties(
+        BenchmarkParams memory params, 
+        function(BenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721Without2981), PaymentSettings.AllowAnyPaymentMethod, 0, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, true);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkCustomPaymentMethodWhitelistBackfilledRoyalties(
+        BenchmarkParams memory params,
+        function(BenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721Without2981), PaymentSettings.CustomPaymentMethodWhitelist, customPaymentMethodWhitelistId, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, true);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkCollectionLevelPricingConstraintsBackfilledRoyalties(
+        BenchmarkParams memory params,
+        function(BenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721Without2981), PaymentSettings.PricingConstraintsCollectionOnly, 0, params.currency, uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, true);
+        _setCollectionPaymentSettingsCollectionPricingBounds(address(test721Without2981), PricingBounds({
+            initialized: true,
+            isSet: true,
+            floorPrice: 1 ether,
+            ceilingPrice: 500 ether
+        }), true);
+
+        
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkTokenLevelPricingConstraintsBackfilledRoyalties(
+        BenchmarkParams memory params,
+        function(BenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721Without2981), PaymentSettings.PricingConstraints, 0, params.currency, uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, true);
+        
+
+        uint256[] memory tokenIds = new uint256[](params.numRuns);
+        PricingBounds[] memory pricingBoundsArray = new PricingBounds[](params.numRuns);
+
+        for (uint256 i = 1; i <= params.numRuns; i++) {
+            tokenIds[i - 1] = i;
+            pricingBoundsArray[i - 1] = PricingBounds({
+                initialized: true,
+                isSet: true,
+                floorPrice: 1 ether,
+                ceilingPrice: 500 ether
+            });
+        }
+
+        _setCollectionPaymentSettingsTokenPricingBounds(address(test721Without2981), tokenIds, pricingBoundsArray);
+        
+        
+        funcBenchmark(params);
+    }
+
+    /************/
+    /* Cosigned */
+    /********** */
+
+    function _runBenchmarkCosigned(
+        CosignedBenchmarkParams memory params, 
+        function(CosignedBenchmarkParams memory) funcBenchmark
+    ) internal {
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkCosignedAllowAnyPaymentMethod(
+        CosignedBenchmarkParams memory params, 
+        function(CosignedBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.AllowAnyPaymentMethod, 0, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkCosignedCustomPaymentMethodWhitelist(
+        CosignedBenchmarkParams memory params,
+        function(CosignedBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.CustomPaymentMethodWhitelist, customPaymentMethodWhitelistId, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkCosignedCollectionLevelPricingConstraints(
+        CosignedBenchmarkParams memory params,
+        function(CosignedBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.PricingConstraintsCollectionOnly, 0, params.currency, uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        _setCollectionPaymentSettingsCollectionPricingBounds(address(test721), PricingBounds({
+            initialized: true,
+            isSet: true,
+            floorPrice: 1 ether,
+            ceilingPrice: 500 ether
+        }), true);
+
+        
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkCosignedTokenLevelPricingConstraints(
+        CosignedBenchmarkParams memory params,
+        function(CosignedBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.PricingConstraints, 0, params.currency, uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+
+        uint256[] memory tokenIds = new uint256[](params.numRuns);
+        PricingBounds[] memory pricingBoundsArray = new PricingBounds[](params.numRuns);
+
+        for (uint256 i = 1; i <= params.numRuns; i++) {
+            tokenIds[i - 1] = i;
+            pricingBoundsArray[i - 1] = PricingBounds({
+                initialized: true,
+                isSet: true,
+                floorPrice: 1 ether,
+                ceilingPrice: 500 ether
+            });
+        }
+
+        _setCollectionPaymentSettingsTokenPricingBounds(address(test721), tokenIds, pricingBoundsArray);
+        
+        
+        funcBenchmark(params);
+    }
+
+    /*****************/
+    /*  Bulk Signed  */
+    /*****************/
+
+    function _runBenchmarkBulk(
+        BulkBenchmarkParams memory params,
+        function(BulkBenchmarkParams memory) funcBenchmark
+    ) internal {
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkBulkAllowAnyPaymentMethod(
+        BulkBenchmarkParams memory params,
+        function(BulkBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.AllowAnyPaymentMethod, 0, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkBulkCustomPaymentMethodWhitelist(
+        BulkBenchmarkParams memory params,
+        function(BulkBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.CustomPaymentMethodWhitelist, customPaymentMethodWhitelistId, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkBulkCollectionLevelPricingConstraints(
+        BulkBenchmarkParams memory params,
+        function(BulkBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.PricingConstraintsCollectionOnly, 0, params.currency, uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        _setCollectionPaymentSettingsCollectionPricingBounds(address(test721), PricingBounds({
+            initialized: true,
+            isSet: true,
+            floorPrice: 1 ether,
+            ceilingPrice: 500 ether
+        }), true);
+
+        
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkBulkTokenLevelPricingConstraints(
+        BulkBenchmarkParams memory params,
+        function(BulkBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.PricingConstraints, 0, params.currency, uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+
+        uint256[] memory tokenIds = new uint256[](2 * params.numRuns * params.batchSize);
+        PricingBounds[] memory pricingBoundsArray = new PricingBounds[](2 * params.numRuns * params.batchSize);
+
+        for (uint256 i = 1; i <= 2 * params.numRuns * params.batchSize; i++) {
+            tokenIds[i - 1] = i;
+            pricingBoundsArray[i - 1] = PricingBounds({
+                initialized: true,
+                isSet: true,
+                floorPrice: 1 ether,
+                ceilingPrice: 500 ether
+            });
+        }
+
+        _setCollectionPaymentSettingsTokenPricingBounds(address(test721), tokenIds, pricingBoundsArray);
+        
+        
+        funcBenchmark(params);
+    }
+
+    /*****************/
+    /* Bulk Cosigned */
+    /*****************/
+
+    function _runBenchmarkBulkCosigned(
+        BulkCosignedBenchmarkParams memory params,
+        function(BulkCosignedBenchmarkParams memory) funcBenchmark
+    ) internal {
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkBulkCosignedAllowAnyPaymentMethod(
+        BulkCosignedBenchmarkParams memory params,
+        function(BulkCosignedBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.AllowAnyPaymentMethod, 0, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkBulkCosignedCustomPaymentMethodWhitelist(
+        BulkCosignedBenchmarkParams memory params,
+        function(BulkCosignedBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.CustomPaymentMethodWhitelist, customPaymentMethodWhitelistId, address(0), uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkBulkCosignedCollectionLevelPricingConstraints(
+        BulkCosignedBenchmarkParams memory params,
+        function(BulkCosignedBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.PricingConstraintsCollectionOnly, 0, params.currency, uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        _setCollectionPaymentSettingsCollectionPricingBounds(address(test721), PricingBounds({
+            initialized: true,
+            isSet: true,
+            floorPrice: 1 ether,
+            ceilingPrice: 500 ether
+        }), true);
+
+        
+        
+        funcBenchmark(params);
+    }
+
+    function _runBenchmarkBulkCosignedTokenLevelPricingConstraints(
+        BulkCosignedBenchmarkParams memory params,
+        function(BulkCosignedBenchmarkParams memory) funcBenchmark
+    ) internal {
+        _setCollectionPaymentSettings(address(test721), PaymentSettings.PricingConstraints, 0, params.currency, uint16(params.royaltyFeeRate), abe, params.royaltyBountyRate, address(0), false, false);
+        
+
+        uint256[] memory tokenIds = new uint256[](2 * params.numRuns * params.batchSize);
+        PricingBounds[] memory pricingBoundsArray = new PricingBounds[](2 * params.numRuns * params.batchSize);
+
+        for (uint256 i = 1; i <= 2 * params.numRuns * params.batchSize; i++) {
+            tokenIds[i - 1] = i;
+            pricingBoundsArray[i - 1] = PricingBounds({
+                initialized: true,
+                isSet: true,
+                floorPrice: 1 ether,
+                ceilingPrice: 500 ether
+            });
+        }
+
+        _setCollectionPaymentSettingsTokenPricingBounds(address(test721), tokenIds, pricingBoundsArray);
+        
+        
+        funcBenchmark(params);
+    }
+
+    /**********************/
+    /*     Buy Listing    */
+    /**********************/
+
+    function _runBenchmarkBuyListing(BenchmarkParams memory params) internal {
+
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test721.mint(alice, tokenId + i);
+                    test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: 0,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: 0,
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                maker: alice,
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test721),
+                tokenId: tokenId,
+                amount: 1,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(alice),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 1,
+                minimumFillAmount: 1,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                _buySignedListingAdvanced(
+                    channel,
+                    vm.addr(params.buyerKey), 
+                    params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    EMPTY_SELECTOR);
+            } else {
+                _buySignedListingWithFeeOnTopAdvanced(
+                    channel,
+                    vm.addr(params.buyerKey), 
+                    params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    feeOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }
+    }
+
+    /*******************************/
+    /*     Buy Cosigned Listing    */
+    /*******************************/
+
+    function _runBenchmarkBuyListingCosigned(CosignedBenchmarkParams memory params) internal {
+
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test721.mint(alice, tokenId + i);
+                    test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: 0,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: uint160(cosignerPk),
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                maker: alice,
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test721),
+                tokenId: tokenId,
+                amount: 1,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(alice),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 1,
+                minimumFillAmount: 1,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _buyEmptyCosignedListingAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                } else {
+                    _buyCosignedListingAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _buyEmptyCosignedListingWithFeeOnTopAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _buyCosignedListingWithFeeOnTopAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }
+    }
+
+    /*****************************************/
+    /*     Buy Listing Partially Fillable    */
+    /*****************************************/
+
+    function _runBenchmarkBuyListingPartialFill(BenchmarkParams memory params) internal {
+
+        uint256 paymentAmount = 100 ether * 1000;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test1155.mint(alice, tokenId + i, 1000);
+                    test1155.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: 0,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: 0,
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC1155_FILL_PARTIAL,
+                maker: alice,
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test1155),
+                tokenId: tokenId,
+                amount: 1000,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(alice),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 500,
+                minimumFillAmount: 500,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            saleDetails.itemPrice = saleDetails.itemPrice - (saleDetails.itemPrice % saleDetails.amount);
+            
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                _buySignedListingAdvanced(
+                    channel,
+                    vm.addr(params.buyerKey), 
+                    params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    EMPTY_SELECTOR);
+            } else {
+                _buySignedListingWithFeeOnTopAdvanced(
+                    channel,
+                    vm.addr(params.buyerKey), 
+                    params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    feeOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }
+    }
+
+    /*************************************************/
+    /*     Buy Cosigned Listing Partially Fillable   */
+    /*************************************************/
+
+    function _runBenchmarkBuyListingCosignedPartialFill(CosignedBenchmarkParams memory params) internal {
+
+        uint256 paymentAmount = 100 ether * 1000;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test1155.mint(alice, tokenId + i, 1000);
+                    test1155.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: 0,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: uint160(cosignerPk),
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC1155_FILL_PARTIAL,
+                maker: alice,
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test1155),
+                tokenId: tokenId,
+                amount: 1000,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(alice),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 500,
+                minimumFillAmount: 500,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            saleDetails.itemPrice = saleDetails.itemPrice - (saleDetails.itemPrice % saleDetails.amount);
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _buyEmptyCosignedListingAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                } else {
+                    _buyCosignedListingAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _buyEmptyCosignedListingWithFeeOnTopAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _buyCosignedListingWithFeeOnTopAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }
+    }
+
+    /**********************/
+    /* Accept Item Offers */
+    /**********************/
+
+    function _runBenchmarkAcceptItemOffer(BenchmarkParams memory params) internal {
+
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test721.mint(alice, tokenId + i);
+                    test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: 0,
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test721),
+                tokenId: tokenId,
+                amount: 1,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 1,
+                minimumFillAmount: 1,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                _acceptSignedItemOfferAdvanced(
+                    channel,
+                    alice, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    EMPTY_SELECTOR);
+            } else {
+                _acceptSignedItemOfferWithFeeOnTopAdvanced(
+                    channel,
+                    alice, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    feeOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }
+    }
+
+    /*******************************/
+    /* Accept Cosigned Item Offers */
+    /*******************************/
+
+    function _runBenchmarkAcceptItemOfferCosigned(CosignedBenchmarkParams memory params) internal {
+
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test721.mint(alice, tokenId + i);
+                    test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: uint160(cosignerPk),
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test721),
+                tokenId: tokenId,
+                amount: 1,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 1,
+                minimumFillAmount: 1,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedItemOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedItemOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedItemOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedItemOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }
+    }
+
+    /****************************/
+    /* Accept Collection Offers */
+    /****************************/
+
+    function _runBenchmarkAcceptCollectionOffer(BenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test721.mint(alice, tokenId + i);
+                    test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: 0,
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test721),
+                tokenId: tokenId,
+                amount: 1,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 1,
+                minimumFillAmount: 1,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                _acceptSignedCollectionOfferAdvanced(
+                    channel,
+                    alice, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    EMPTY_SELECTOR);
+            } else {
+                _acceptSignedCollectionOfferWithFeeOnTopAdvanced(
+                    channel,
+                    alice, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    feeOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }    
+    }
+
+    /*************************************/
+    /* Accept Cosigned Collection Offers */
+    /*************************************/
+
+    function _runBenchmarkAcceptCollectionOfferCosigned(CosignedBenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test721.mint(alice, tokenId + i);
+                    test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: uint160(cosignerPk),
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test721),
+                tokenId: tokenId,
+                amount: 1,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 1,
+                minimumFillAmount: 1,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedCollectionOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedCollectionOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedCollectionOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedCollectionOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }    
+    }
+
+    /****************************/
+    /* Accept Token Set Offers  */
+    /****************************/
+
+    function _runBenchmarkAcceptTokenSetOffer(BenchmarkParams memory params) internal {
+        uint256[] memory tokenSetIds = new uint256[](params.numRuns + 1);
+        bytes32[] memory data = new bytes32[](params.numRuns + 1);
+        for (uint256 tokenId = 1; tokenId <= params.numRuns + 1; tokenId++) {
+            tokenSetIds[tokenId - 1] = tokenId;
+            data[tokenId - 1] = keccak256(abi.encode(address(test721), tokenId));
+        }
+
+        
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : 100 ether * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test721.mint(alice, tokenId + i);
+                    test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(100 ether),
+                beneficiary: params.beneficiary,
+                cosignerKey: 0,
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test721),
+                tokenId: tokenId,
+                amount: 1,
+                itemPrice: 100 ether,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 1,
+                minimumFillAmount: 1,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                _acceptSignedTokenSetOfferAdvanced(
+                    channel,
+                    alice,
+                    fuzzedOrderInputs,
+                    saleDetails, 
+                    TestTokenSetProof({
+                        rootHash: MerkleTree.getRootSorted(data),
+                        proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                    }),
+                    EMPTY_SELECTOR);
+            } else {
+                _acceptSignedTokenSetOfferWithFeeOnTopAdvanced(
+                    channel,
+                    alice, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    TestTokenSetProof({
+                        rootHash: MerkleTree.getRootSorted(data),
+                        proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                    }),
+                    feeOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }    
+    }
+
+    /*************************************/
+    /* Accept Cosigned Token Set Offers  */
+    /*************************************/
+
+    function _runBenchmarkAcceptTokenSetOfferCosigned(CosignedBenchmarkParams memory params) internal {
+        uint256[] memory tokenSetIds = new uint256[](params.numRuns + 1);
+        bytes32[] memory data = new bytes32[](params.numRuns + 1);
+        for (uint256 tokenId = 1; tokenId <= params.numRuns + 1; tokenId++) {
+            tokenSetIds[tokenId - 1] = tokenId;
+            data[tokenId - 1] = keccak256(abi.encode(address(test721), tokenId));
+        }
+
+        
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : 100 ether * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test721.mint(alice, tokenId + i);
+                    test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(100 ether),
+                beneficiary: params.beneficiary,
+                cosignerKey: uint160(cosignerPk),
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test721),
+                tokenId: tokenId,
+                amount: 1,
+                itemPrice: 100 ether,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 1,
+                minimumFillAmount: 1,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedTokenSetOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        TestTokenSetProof({
+                            rootHash: MerkleTree.getRootSorted(data),
+                            proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                        }),
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedTokenSetOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        TestTokenSetProof({
+                            rootHash: MerkleTree.getRootSorted(data),
+                            proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                        }),
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedTokenSetOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        TestTokenSetProof({
+                            rootHash: MerkleTree.getRootSorted(data),
+                            proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                        }),
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedTokenSetOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        TestTokenSetProof({
+                            rootHash: MerkleTree.getRootSorted(data),
+                            proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                        }),
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }    
+    }
+
+    /***********************************/
+    /* Accept Item Offers Partial Fill */
+    /***********************************/
+
+    function _runBenchmarkAcceptItemOfferPartialFill(BenchmarkParams memory params) internal {
+
+        uint256 paymentAmount = 100 ether * 1000;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test1155.mint(alice, tokenId + i, 1000);
+                    test1155.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: 0,
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC1155_FILL_PARTIAL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test1155),
+                tokenId: tokenId,
+                amount: 1000,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 500,
+                minimumFillAmount: 500,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            saleDetails.itemPrice = saleDetails.itemPrice - (saleDetails.itemPrice % saleDetails.amount);
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                _acceptSignedItemOfferAdvanced(
+                    channel,
+                    alice, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    EMPTY_SELECTOR);
+            } else {
+                _acceptSignedItemOfferWithFeeOnTopAdvanced(
+                    channel,
+                    alice, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    feeOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }
+    }
+
+    /********************************************/
+    /* Accept Cosigned Item Offers Partial Fill */
+    /********************************************/
+
+    function _runBenchmarkAcceptItemOfferCosignedPartialFill(CosignedBenchmarkParams memory params) internal {
+
+        uint256 paymentAmount = 100 ether * 1000;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test1155.mint(alice, tokenId + i, 1000);
+                    test1155.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: uint160(cosignerPk),
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC1155_FILL_PARTIAL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test1155),
+                tokenId: tokenId,
+                amount: 1000,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 500,
+                minimumFillAmount: 500,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            saleDetails.itemPrice = saleDetails.itemPrice - (saleDetails.itemPrice % saleDetails.amount);
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedItemOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedItemOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedItemOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedItemOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }
+    }
+
+    /*****************************************/
+    /* Accept Collection Offers Partial Fill */
+    /*****************************************/
+
+    function _runBenchmarkAcceptCollectionOfferPartialFill(BenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether * 1000;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test1155.mint(alice, tokenId + i, 1000);
+                    test1155.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: 0,
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC1155_FILL_PARTIAL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test1155),
+                tokenId: tokenId,
+                amount: 1000,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 500,
+                minimumFillAmount: 500,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            saleDetails.itemPrice = saleDetails.itemPrice - (saleDetails.itemPrice % saleDetails.amount);
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                _acceptSignedCollectionOfferAdvanced(
+                    channel,
+                    alice, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    EMPTY_SELECTOR);
+            } else {
+                _acceptSignedCollectionOfferWithFeeOnTopAdvanced(
+                    channel,
+                    alice, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    feeOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }    
+    }
+
+    /**************************************************/
+    /* Accept Cosigned Collection Offers Partial Fill */
+    /**************************************************/
+
+    function _runBenchmarkAcceptCollectionOfferCosignedPartialFill(CosignedBenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether * 1000;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test1155.mint(alice, tokenId + i, 1000);
+                    test1155.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: uint160(cosignerPk),
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC1155_FILL_PARTIAL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test1155),
+                tokenId: tokenId,
+                amount: 1000,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 500,
+                minimumFillAmount: 500,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            saleDetails.itemPrice = saleDetails.itemPrice - (saleDetails.itemPrice % saleDetails.amount);
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedCollectionOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedCollectionOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedCollectionOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedCollectionOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }    
+    }
+
+    /*****************************************/
+    /* Accept Token Set Offers Partial Fill  */
+    /*****************************************/
+
+    function _runBenchmarkAcceptTokenSetOfferPartialFill(BenchmarkParams memory params) internal {
+        uint256[] memory tokenSetIds = new uint256[](params.numRuns + 1);
+        bytes32[] memory data = new bytes32[](params.numRuns + 1);
+        for (uint256 tokenId = 1; tokenId <= params.numRuns + 1; tokenId++) {
+            tokenSetIds[tokenId - 1] = tokenId;
+            data[tokenId - 1] = keccak256(abi.encode(address(test1155), tokenId));
+        }
+
+        
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : 100 ether * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test1155.mint(alice, tokenId + i, 1000);
+                    test1155.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(100 ether),
+                beneficiary: params.beneficiary,
+                cosignerKey: 0,
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC1155_FILL_PARTIAL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test1155),
+                tokenId: tokenId,
+                amount: 1000,
+                itemPrice: 100 ether * 1000,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 500,
+                minimumFillAmount: 500,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            saleDetails.itemPrice = saleDetails.itemPrice - (saleDetails.itemPrice % saleDetails.amount);
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                _acceptSignedTokenSetOfferAdvanced(
+                    channel,
+                    alice,
+                    fuzzedOrderInputs,
+                    saleDetails, 
+                    TestTokenSetProof({
+                        rootHash: MerkleTree.getRootSorted(data),
+                        proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                    }),
+                    EMPTY_SELECTOR);
+            } else {
+                _acceptSignedTokenSetOfferWithFeeOnTopAdvanced(
+                    channel,
+                    alice, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    TestTokenSetProof({
+                        rootHash: MerkleTree.getRootSorted(data),
+                        proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                    }),
+                    feeOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }    
+    }
+
+    /*************************************************/
+    /* Accept Cosigned Token Set Offers Partial Fill */
+    /*************************************************/
+
+    function _runBenchmarkAcceptTokenSetOfferCosignedPartialFill(CosignedBenchmarkParams memory params) internal {
+        uint256[] memory tokenSetIds = new uint256[](params.numRuns + 1);
+        bytes32[] memory data = new bytes32[](params.numRuns + 1);
+        for (uint256 tokenId = 1; tokenId <= params.numRuns + 1; tokenId++) {
+            tokenSetIds[tokenId - 1] = tokenId;
+            data[tokenId - 1] = keccak256(abi.encode(address(test1155), tokenId));
+        }
+
+        
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : 100 ether * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test1155.mint(alice, tokenId + i, 1000);
+                    test1155.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: params.buyerKey,
+                tokenId: tokenId,
+                itemPrice: uint128(100 ether),
+                beneficiary: params.beneficiary,
+                cosignerKey: uint160(cosignerPk),
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC1155_FILL_PARTIAL,
+                maker: vm.addr(params.buyerKey),
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test1155),
+                tokenId: tokenId,
+                amount: 1000,
+                itemPrice: 100 ether * 1000,
+                nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 500,
+                minimumFillAmount: 500,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            saleDetails.itemPrice = saleDetails.itemPrice - (saleDetails.itemPrice % saleDetails.amount);
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedTokenSetOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        TestTokenSetProof({
+                            rootHash: MerkleTree.getRootSorted(data),
+                            proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                        }),
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedTokenSetOfferAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        TestTokenSetProof({
+                            rootHash: MerkleTree.getRootSorted(data),
+                            proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                        }),
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _acceptEmptyCosignedTokenSetOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        TestTokenSetProof({
+                            rootHash: MerkleTree.getRootSorted(data),
+                            proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                        }),
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _acceptCosignedTokenSetOfferWithFeeOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputs, 
+                        saleDetails, 
+                        TestTokenSetProof({
+                            rootHash: MerkleTree.getRootSorted(data),
+                            proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                        }),
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }    
+    }
+
+    /**********************/
+    /* Bulk Buy Listings  */
+    /**********************/
+
+    function _runBenchmarkBulkBuyListings(BulkBenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 run = 0; run < params.numRuns; run++) {
+            FuzzedOrder721[] memory fuzzedOrderInputsArray = new FuzzedOrder721[](params.batchSize); 
+            Order[] memory saleDetailsArray = new Order[](params.batchSize);
+            FeeOnTop[] memory feesOnTop = new FeeOnTop[](params.batchSize);
+
+            for (uint256 batchIndex = 0; batchIndex < params.batchSize; batchIndex++) {
+                uint256 tokenId = run * params.batchSize + batchIndex + 1;
+
+                if ((tokenId - 1) % (3 * params.batchSize) == 0) {
+                    for (uint256 i = 0; i < (3 * params.batchSize); i++) {
+                        test721.mint(alice, tokenId + i);
+                        test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                    }
+                }
+
+                fuzzedOrderInputsArray[batchIndex] = FuzzedOrder721({
+                    buyerIsContract: false,
+                    marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                    royaltyFeeRate: uint24(params.royaltyFeeRate),
+                    sellerKey: uint160(alicePk),
+                    expirationSeconds: 0, 
+                    buyerKey: 0,
+                    tokenId: tokenId,
+                    itemPrice: uint128(paymentAmount),
+                    beneficiary: params.beneficiary,
+                    cosignerKey: 0,
+                    marketplace: cal,
+                    royaltyReceiver: abe
+                });
+
+                saleDetailsArray[batchIndex] = Order({
+                    protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                    maker: alice,
+                    beneficiary: params.beneficiary,
+                    marketplace: cal,
+                    fallbackRoyaltyRecipient: address(0),
+                    paymentMethod: params.currency,
+                    tokenAddress: address(test721),
+                    tokenId: tokenId,
+                    amount: 1,
+                    itemPrice: paymentAmount,
+                    nonce: _getNextNonce(alice),
+                    expiration: type(uint48).max,
+                    marketplaceFeeNumerator: params.marketplaceFeeRate,
+                    maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                    requestedFillAmount: 1,
+                    minimumFillAmount: 1,
+                    protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+                });
+
+                feesOnTop[batchIndex] = feeOnTop;
+            }
+    
+            if (params.feeOnTopRate == type(uint96).max) {
+                _bulkBuySignedListingsAdvanced(
+                    channel,
+                    vm.addr(params.buyerKey), 
+                    params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                    fuzzedOrderInputsArray, 
+                    saleDetailsArray, 
+                    EMPTY_SELECTOR);
+            } else {
+                _bulkBuySignedListingsWithFeeOnTopAdvanced(
+                    channel,
+                    vm.addr(params.buyerKey), 
+                    params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                    fuzzedOrderInputsArray, 
+                    saleDetailsArray, 
+                    feesOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }
+    }
+
+    /*******************************/
+    /* Cosigned Bulk Buy Listings  */
+    /*******************************/
+
+    function _runBenchmarkBulkBuyListingsCosigned(BulkCosignedBenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 run = 0; run < params.numRuns; run++) {
+            FuzzedOrder721[] memory fuzzedOrderInputsArray = new FuzzedOrder721[](params.batchSize); 
+            Order[] memory saleDetailsArray = new Order[](params.batchSize);
+            FeeOnTop[] memory feesOnTop = new FeeOnTop[](params.batchSize);
+
+            for (uint256 batchIndex = 0; batchIndex < params.batchSize; batchIndex++) {
+                uint256 tokenId = run * params.batchSize + batchIndex + 1;
+
+                if ((tokenId - 1) % (3 * params.batchSize) == 0) {
+                    for (uint256 i = 0; i < (3 * params.batchSize); i++) {
+                        test721.mint(alice, tokenId + i);
+                        test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                    }
+                }
+
+                fuzzedOrderInputsArray[batchIndex] = FuzzedOrder721({
+                    buyerIsContract: false,
+                    marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                    royaltyFeeRate: uint24(params.royaltyFeeRate),
+                    sellerKey: uint160(alicePk),
+                    expirationSeconds: 0, 
+                    buyerKey: 0,
+                    tokenId: tokenId,
+                    itemPrice: uint128(paymentAmount),
+                    beneficiary: params.beneficiary,
+                    cosignerKey: uint160(cosignerPk),
+                    marketplace: cal,
+                    royaltyReceiver: abe
+                });
+
+                saleDetailsArray[batchIndex] = Order({
+                    protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                    maker: alice,
+                    beneficiary: params.beneficiary,
+                    marketplace: cal,
+                    fallbackRoyaltyRecipient: address(0),
+                    paymentMethod: params.currency,
+                    tokenAddress: address(test721),
+                    tokenId: tokenId,
+                    amount: 1,
+                    itemPrice: paymentAmount,
+                    nonce: _getNextNonce(alice),
+                    expiration: type(uint48).max,
+                    marketplaceFeeNumerator: params.marketplaceFeeRate,
+                    maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                    requestedFillAmount: 1,
+                    minimumFillAmount: 1,
+                    protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+                });
+
+                feesOnTop[batchIndex] = feeOnTop;
+            }
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _bulkBuyEmptyCosignedListingsAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        EMPTY_SELECTOR);
+                } else {
+                    _bulkBuyCosignedListingsAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _bulkBuyEmptyCosignedListingsWithFeesOnTopAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        feesOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _bulkBuyCosignedListingsWithFeesOnTopAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        feesOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }
+    }
+
+    /***************************/
+    /* Bulk Accept Item Offers */
+    /***************************/
+
+    function _runBenchmarkBulkAcceptItemOffers(BulkBenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+
+        for (uint256 run = 0; run < params.numRuns; run++) {
+            FuzzedOrder721[] memory fuzzedOrderInputsArray = new FuzzedOrder721[](params.batchSize); 
+            Order[] memory saleDetailsArray = new Order[](params.batchSize);
+            FeeOnTop[] memory feesOnTop = new FeeOnTop[](params.batchSize);
+
+            for (uint256 batchIndex = 0; batchIndex < params.batchSize; batchIndex++) {
+                uint256 tokenId = run * params.batchSize + batchIndex + 1;
+
+                if ((tokenId - 1) % (3 * params.batchSize) == 0) {
+                    for (uint256 i = 0; i < (3 * params.batchSize); i++) {
+                        test721.mint(alice, tokenId + i);
+                        test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                    }
+                }
+
+                fuzzedOrderInputsArray[batchIndex] = FuzzedOrder721({
+                    buyerIsContract: false,
+                    marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                    royaltyFeeRate: uint24(params.royaltyFeeRate),
+                    sellerKey: uint160(alicePk),
+                    expirationSeconds: 0, 
+                    buyerKey: params.buyerKey,
+                    tokenId: tokenId,
+                    itemPrice: uint128(paymentAmount),
+                    beneficiary: params.beneficiary,
+                    cosignerKey: 0,
+                    marketplace: cal,
+                    royaltyReceiver: abe
+                });
+    
+                saleDetailsArray[batchIndex] = Order({
+                    protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                    maker: vm.addr(params.buyerKey),
+                    beneficiary: params.beneficiary,
+                    marketplace: cal,
+                    fallbackRoyaltyRecipient: address(0),
+                    paymentMethod: params.currency,
+                    tokenAddress: address(test721),
+                    tokenId: tokenId,
+                    amount: 1,
+                    itemPrice: paymentAmount,
+                    nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                    expiration: type(uint48).max,
+                    marketplaceFeeNumerator: params.marketplaceFeeRate,
+                    maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                    requestedFillAmount: 1,
+                    minimumFillAmount: 1,
+                    protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+                });
+
+                feesOnTop[batchIndex] = feeOnTop;
+            }
+    
+            if (params.feeOnTopRate == type(uint96).max) {
+                _bulkAcceptSignedItemOffersAdvanced(
+                    channel,
+                    alice,
+                    fuzzedOrderInputsArray, 
+                    saleDetailsArray, 
+                    EMPTY_SELECTOR);
+            } else {
+                _bulkAcceptSignedItemOffersWithFeesOnTopAdvanced(
+                    channel,
+                    alice,
+                    fuzzedOrderInputsArray, 
+                    saleDetailsArray, 
+                    feesOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }
+    }
+
+    /************************************/
+    /* Bulk Accept Cosigned Item Offers */
+    /************************************/
+
+    function _runBenchmarkBulkAcceptItemOffersCosigned(BulkCosignedBenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+
+        for (uint256 run = 0; run < params.numRuns; run++) {
+            FuzzedOrder721[] memory fuzzedOrderInputsArray = new FuzzedOrder721[](params.batchSize); 
+            Order[] memory saleDetailsArray = new Order[](params.batchSize);
+            FeeOnTop[] memory feesOnTop = new FeeOnTop[](params.batchSize);
+
+            for (uint256 batchIndex = 0; batchIndex < params.batchSize; batchIndex++) {
+                uint256 tokenId = run * params.batchSize + batchIndex + 1;
+
+                if ((tokenId - 1) % (3 * params.batchSize) == 0) {
+                    for (uint256 i = 0; i < (3 * params.batchSize); i++) {
+                        test721.mint(alice, tokenId + i);
+                        test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                    }
+                }
+
+                fuzzedOrderInputsArray[batchIndex] = FuzzedOrder721({
+                    buyerIsContract: false,
+                    marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                    royaltyFeeRate: uint24(params.royaltyFeeRate),
+                    sellerKey: uint160(alicePk),
+                    expirationSeconds: 0, 
+                    buyerKey: params.buyerKey,
+                    tokenId: tokenId,
+                    itemPrice: uint128(paymentAmount),
+                    beneficiary: params.beneficiary,
+                    cosignerKey: uint160(cosignerPk),
+                    marketplace: cal,
+                    royaltyReceiver: abe
+                });
+    
+                saleDetailsArray[batchIndex] = Order({
+                    protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                    maker: vm.addr(params.buyerKey),
+                    beneficiary: params.beneficiary,
+                    marketplace: cal,
+                    fallbackRoyaltyRecipient: address(0),
+                    paymentMethod: params.currency,
+                    tokenAddress: address(test721),
+                    tokenId: tokenId,
+                    amount: 1,
+                    itemPrice: paymentAmount,
+                    nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                    expiration: type(uint48).max,
+                    marketplaceFeeNumerator: params.marketplaceFeeRate,
+                    maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                    requestedFillAmount: 1,
+                    minimumFillAmount: 1,
+                    protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+                });
+
+                feesOnTop[batchIndex] = feeOnTop;
+            }
+    
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _bulkAcceptEmptyCosignedItemOffersAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        EMPTY_SELECTOR);
+                } else {
+                    _bulkAcceptCosignedItemOffersAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _bulkAcceptEmptyCosignedItemOffersWithFeesOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        feesOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _bulkAcceptCosignedItemOffersWithFeesOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        feesOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }
+    }
+
+    /*********************************/
+    /* Bulk Accept Collection Offers */
+    /*********************************/
+
+    function _runBenchmarkBulkAcceptCollectionOffers(BulkBenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+
+        for (uint256 run = 0; run < params.numRuns; run++) {
+            FuzzedOrder721[] memory fuzzedOrderInputsArray = new FuzzedOrder721[](params.batchSize); 
+            Order[] memory saleDetailsArray = new Order[](params.batchSize);
+            FeeOnTop[] memory feesOnTop = new FeeOnTop[](params.batchSize);
+
+            for (uint256 batchIndex = 0; batchIndex < params.batchSize; batchIndex++) {
+                uint256 tokenId = run * params.batchSize + batchIndex + 1;
+
+                if ((tokenId - 1) % (3 * params.batchSize) == 0) {
+                    for (uint256 i = 0; i < (3 * params.batchSize); i++) {
+                        test721.mint(alice, tokenId + i);
+                        test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                    }
+                }
+
+                fuzzedOrderInputsArray[batchIndex] = FuzzedOrder721({
+                    buyerIsContract: false,
+                    marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                    royaltyFeeRate: uint24(params.royaltyFeeRate),
+                    sellerKey: uint160(alicePk),
+                    expirationSeconds: 0, 
+                    buyerKey: params.buyerKey,
+                    tokenId: tokenId,
+                    itemPrice: uint128(paymentAmount),
+                    beneficiary: params.beneficiary,
+                    cosignerKey: 0,
+                    marketplace: cal,
+                    royaltyReceiver: abe
+                });
+    
+                saleDetailsArray[batchIndex] = Order({
+                    protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                    maker: vm.addr(params.buyerKey),
+                    beneficiary: params.beneficiary,
+                    marketplace: cal,
+                    fallbackRoyaltyRecipient: address(0),
+                    paymentMethod: params.currency,
+                    tokenAddress: address(test721),
+                    tokenId: tokenId,
+                    amount: 1,
+                    itemPrice: paymentAmount,
+                    nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                    expiration: type(uint48).max,
+                    marketplaceFeeNumerator: params.marketplaceFeeRate,
+                    maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                    requestedFillAmount: 1,
+                    minimumFillAmount: 1,
+                    protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+                });
+
+                feesOnTop[batchIndex] = feeOnTop;
+            }
+    
+            if (params.feeOnTopRate == type(uint96).max) {
+                _bulkAcceptSignedCollectionOffersAdvanced(
+                    channel,
+                    alice,
+                    fuzzedOrderInputsArray, 
+                    saleDetailsArray, 
+                    EMPTY_SELECTOR);
+            } else {
+                _bulkAcceptSignedCollectionOffersWithFeesOnTopAdvanced(
+                    channel,
+                    alice,
+                    fuzzedOrderInputsArray, 
+                    saleDetailsArray, 
+                    feesOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }
+    }
+
+    /******************************************/
+    /* Bulk Accept Cosigned Collection Offers */
+    /******************************************/
+
+    function _runBenchmarkBulkAcceptCollectionOffersCosigned(BulkCosignedBenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+
+        for (uint256 run = 0; run < params.numRuns; run++) {
+            FuzzedOrder721[] memory fuzzedOrderInputsArray = new FuzzedOrder721[](params.batchSize); 
+            Order[] memory saleDetailsArray = new Order[](params.batchSize);
+            FeeOnTop[] memory feesOnTop = new FeeOnTop[](params.batchSize);
+
+            for (uint256 batchIndex = 0; batchIndex < params.batchSize; batchIndex++) {
+                uint256 tokenId = run * params.batchSize + batchIndex + 1;
+
+                if ((tokenId - 1) % (3 * params.batchSize) == 0) {
+                    for (uint256 i = 0; i < (3 * params.batchSize); i++) {
+                        test721.mint(alice, tokenId + i);
+                        test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                    }
+                }
+
+                fuzzedOrderInputsArray[batchIndex] = FuzzedOrder721({
+                    buyerIsContract: false,
+                    marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                    royaltyFeeRate: uint24(params.royaltyFeeRate),
+                    sellerKey: uint160(alicePk),
+                    expirationSeconds: 0, 
+                    buyerKey: params.buyerKey,
+                    tokenId: tokenId,
+                    itemPrice: uint128(paymentAmount),
+                    beneficiary: params.beneficiary,
+                    cosignerKey: uint160(cosignerPk),
+                    marketplace: cal,
+                    royaltyReceiver: abe
+                });
+    
+                saleDetailsArray[batchIndex] = Order({
+                    protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                    maker: vm.addr(params.buyerKey),
+                    beneficiary: params.beneficiary,
+                    marketplace: cal,
+                    fallbackRoyaltyRecipient: address(0),
+                    paymentMethod: params.currency,
+                    tokenAddress: address(test721),
+                    tokenId: tokenId,
+                    amount: 1,
+                    itemPrice: paymentAmount,
+                    nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                    expiration: type(uint48).max,
+                    marketplaceFeeNumerator: params.marketplaceFeeRate,
+                    maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                    requestedFillAmount: 1,
+                    minimumFillAmount: 1,
+                    protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+                });
+
+                feesOnTop[batchIndex] = feeOnTop;
+            }
+    
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _bulkAcceptEmptyCosignedCollectionOffersAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        EMPTY_SELECTOR);
+                } else {
+                    _bulkAcceptCosignedCollectionOffersAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _bulkAcceptEmptyCosignedCollectionOffersWithFeesOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        feesOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _bulkAcceptCosignedCollectionOffersWithFeesOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        feesOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }
+    }
+
+    /*********************************/
+    /* Bulk Accept Token Set Offers  */
+    /*********************************/
+
+    function _runBenchmarkBulkAcceptTokenSetOffers(BulkBenchmarkParams memory params) internal {
+        uint256[] memory tokenSetIds = new uint256[](params.numRuns * params.batchSize);
+        bytes32[] memory data = new bytes32[](params.numRuns * params.batchSize);
+        for (uint256 tokenId = 1; tokenId <= params.numRuns * params.batchSize; tokenId++) {
+            tokenSetIds[tokenId - 1] = tokenId;
+            data[tokenId - 1] = keccak256(abi.encode(address(test721), tokenId));
+        }
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : 100 ether * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+
+        for (uint256 run = 0; run < params.numRuns; run++) {
+            FuzzedOrder721[] memory fuzzedOrderInputsArray = new FuzzedOrder721[](params.batchSize); 
+            Order[] memory saleDetailsArray = new Order[](params.batchSize);
+            TestTokenSetProof[] memory tokenSetProofsArray = new TestTokenSetProof[](params.batchSize);
+            FeeOnTop[] memory feesOnTop = new FeeOnTop[](params.batchSize);
+
+            for (uint256 batchIndex = 0; batchIndex < params.batchSize; batchIndex++) {
+                uint256 tokenId = run * params.batchSize + batchIndex + 1;
+
+                if ((tokenId - 1) % (3 * params.batchSize) == 0) {
+                    for (uint256 i = 0; i < (3 * params.batchSize); i++) {
+                        test721.mint(alice, tokenId + i);
+                        test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                    }
+                }
+
+                fuzzedOrderInputsArray[batchIndex] = FuzzedOrder721({
+                    buyerIsContract: false,
+                    marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                    royaltyFeeRate: uint24(params.royaltyFeeRate),
+                    sellerKey: uint160(alicePk),
+                    expirationSeconds: 0, 
+                    buyerKey: params.buyerKey,
+                    tokenId: tokenId,
+                    itemPrice: uint128(100 ether),
+                    beneficiary: params.beneficiary,
+                    cosignerKey: 0,
+                    marketplace: cal,
+                    royaltyReceiver: abe
+                });
+    
+                saleDetailsArray[batchIndex] = Order({
+                    protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                    maker: vm.addr(params.buyerKey),
+                    beneficiary: params.beneficiary,
+                    marketplace: cal,
+                    fallbackRoyaltyRecipient: address(0),
+                    paymentMethod: params.currency,
+                    tokenAddress: address(test721),
+                    tokenId: tokenId,
+                    amount: 1,
+                    itemPrice: 100 ether,
+                    nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                    expiration: type(uint48).max,
+                    marketplaceFeeNumerator: params.marketplaceFeeRate,
+                    maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                    requestedFillAmount: 1,
+                    minimumFillAmount: 1,
+                    protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+                });
+
+                tokenSetProofsArray[batchIndex] = TestTokenSetProof({
+                    rootHash: MerkleTree.getRootSorted(data),
+                    proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                });
+
+                feesOnTop[batchIndex] = feeOnTop;
+            }
+    
+            if (params.feeOnTopRate == type(uint96).max) {
+                _bulkAcceptSignedTokenSetOffersAdvanced(
+                    channel,
+                    alice,
+                    fuzzedOrderInputsArray, 
+                    saleDetailsArray, 
+                    tokenSetProofsArray,
+                    EMPTY_SELECTOR);
+            } else {
+                _bulkAcceptSignedTokenSetOffersWithFeesOnTopAdvanced(
+                    channel,
+                    alice,
+                    fuzzedOrderInputsArray, 
+                    saleDetailsArray, 
+                    tokenSetProofsArray,
+                    feesOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }
+    }
+
+    /******************************************/
+    /* Bulk Accept Cosigned Token Set Offers  */
+    /******************************************/
+
+    function _runBenchmarkBulkAcceptTokenSetOffersCosigned(BulkCosignedBenchmarkParams memory params) internal {
+        uint256[] memory tokenSetIds = new uint256[](params.numRuns * params.batchSize);
+        bytes32[] memory data = new bytes32[](params.numRuns * params.batchSize);
+        for (uint256 tokenId = 1; tokenId <= params.numRuns * params.batchSize; tokenId++) {
+            tokenSetIds[tokenId - 1] = tokenId;
+            data[tokenId - 1] = keccak256(abi.encode(address(test721), tokenId));
+        }
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : 100 ether * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+
+        for (uint256 run = 0; run < params.numRuns; run++) {
+            FuzzedOrder721[] memory fuzzedOrderInputsArray = new FuzzedOrder721[](params.batchSize); 
+            Order[] memory saleDetailsArray = new Order[](params.batchSize);
+            TestTokenSetProof[] memory tokenSetProofsArray = new TestTokenSetProof[](params.batchSize);
+            FeeOnTop[] memory feesOnTop = new FeeOnTop[](params.batchSize);
+
+            for (uint256 batchIndex = 0; batchIndex < params.batchSize; batchIndex++) {
+                uint256 tokenId = run * params.batchSize + batchIndex + 1;
+
+                if ((tokenId - 1) % (3 * params.batchSize) == 0) {
+                    for (uint256 i = 0; i < (3 * params.batchSize); i++) {
+                        test721.mint(alice, tokenId + i);
+                        test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                    }
+                }
+
+                fuzzedOrderInputsArray[batchIndex] = FuzzedOrder721({
+                    buyerIsContract: false,
+                    marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                    royaltyFeeRate: uint24(params.royaltyFeeRate),
+                    sellerKey: uint160(alicePk),
+                    expirationSeconds: 0, 
+                    buyerKey: params.buyerKey,
+                    tokenId: tokenId,
+                    itemPrice: uint128(100 ether),
+                    beneficiary: params.beneficiary,
+                    cosignerKey: uint160(cosignerPk),
+                    marketplace: cal,
+                    royaltyReceiver: abe
+                });
+    
+                saleDetailsArray[batchIndex] = Order({
+                    protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                    maker: vm.addr(params.buyerKey),
+                    beneficiary: params.beneficiary,
+                    marketplace: cal,
+                    fallbackRoyaltyRecipient: address(0),
+                    paymentMethod: params.currency,
+                    tokenAddress: address(test721),
+                    tokenId: tokenId,
+                    amount: 1,
+                    itemPrice: 100 ether,
+                    nonce: _getNextNonce(vm.addr(params.buyerKey)),
+                    expiration: type(uint48).max,
+                    marketplaceFeeNumerator: params.marketplaceFeeRate,
+                    maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                    requestedFillAmount: 1,
+                    minimumFillAmount: 1,
+                    protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+                });
+
+                tokenSetProofsArray[batchIndex] = TestTokenSetProof({
+                    rootHash: MerkleTree.getRootSorted(data),
+                    proof: MerkleTree.getProofSorted(data, tokenId - 1)
+                });
+
+                feesOnTop[batchIndex] = feeOnTop;
+            }
+    
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _bulkAcceptEmptyCosignedTokenSetOffersAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        tokenSetProofsArray,
+                        EMPTY_SELECTOR);
+                } else {
+                    _bulkAcceptCosignedTokenSetOffersAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        tokenSetProofsArray,
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _bulkAcceptEmptyCosignedTokenSetOffersWithFeesOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        tokenSetProofsArray,
+                        feesOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _bulkAcceptCosignedTokenSetOffersWithFeesOnTopAdvanced(
+                        channel,
+                        alice, 
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        tokenSetProofsArray,
+                        feesOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }
+    }
+
+    /*********************/
+    /* Sweep Collection  */
+    /*********************/
+
+    function _runBenchmarkSweepCollection(BulkBenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : params.batchSize * paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 run = 0; run < params.numRuns; run++) {
+            FuzzedOrder721[] memory fuzzedOrderInputsArray = new FuzzedOrder721[](params.batchSize); 
+            Order[] memory saleDetailsArray = new Order[](params.batchSize);
+
+            SweepOrder memory sweepOrder = SweepOrder({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                tokenAddress: address(test721),
+                paymentMethod: params.currency,
+                beneficiary: params.beneficiary
+            });
+
+            for (uint256 batchIndex = 0; batchIndex < params.batchSize; batchIndex++) {
+                uint256 tokenId = run * params.batchSize + batchIndex + 1;
+
+                if ((tokenId - 1) % (3 * params.batchSize) == 0) {
+                    for (uint256 i = 0; i < (3 * params.batchSize); i++) {
+                        test721.mint(alice, tokenId + i);
+                        test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                    }
+                }
+
+                fuzzedOrderInputsArray[batchIndex] = FuzzedOrder721({
+                    buyerIsContract: false,
+                    marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                    royaltyFeeRate: uint24(params.royaltyFeeRate),
+                    sellerKey: uint160(alicePk),
+                    expirationSeconds: 0, 
+                    buyerKey: 0,
+                    tokenId: tokenId,
+                    itemPrice: uint128(paymentAmount),
+                    beneficiary: params.beneficiary,
+                    cosignerKey: 0,
+                    marketplace: cal,
+                    royaltyReceiver: abe
+                });
+
+                saleDetailsArray[batchIndex] = Order({
+                    protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                    maker: alice,
+                    beneficiary: params.beneficiary,
+                    marketplace: cal,
+                    fallbackRoyaltyRecipient: address(0),
+                    paymentMethod: params.currency,
+                    tokenAddress: address(test721),
+                    tokenId: tokenId,
+                    amount: 1,
+                    itemPrice: paymentAmount,
+                    nonce: _getNextNonce(alice),
+                    expiration: type(uint48).max,
+                    marketplaceFeeNumerator: params.marketplaceFeeRate,
+                    maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                    requestedFillAmount: 1,
+                    minimumFillAmount: 1,
+                    protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+                });
+            }
+    
+            if (params.feeOnTopRate == type(uint96).max) {
+                _sweepSignedListingsAdvanced(
+                    channel,
+                    vm.addr(params.buyerKey), 
+                    params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                    sweepOrder,
+                    fuzzedOrderInputsArray, 
+                    saleDetailsArray, 
+                    EMPTY_SELECTOR);
+            } else {
+                _sweepSignedListingsWithFeeOnTopAdvanced(
+                    channel,
+                    vm.addr(params.buyerKey), 
+                    params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                    sweepOrder,
+                    fuzzedOrderInputsArray, 
+                    saleDetailsArray, 
+                    feeOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }
+    }
+
+    /***************************************/
+    /* Cosigned Sweep Collection Listings  */
+    /***************************************/
+
+    function _runBenchmarkSweepCollectionCosigned(BulkCosignedBenchmarkParams memory params) internal {
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : params.batchSize * paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 run = 0; run < params.numRuns; run++) {
+            FuzzedOrder721[] memory fuzzedOrderInputsArray = new FuzzedOrder721[](params.batchSize); 
+            Order[] memory saleDetailsArray = new Order[](params.batchSize);
+
+            SweepOrder memory sweepOrder = SweepOrder({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                beneficiary: params.beneficiary,
+                paymentMethod: params.currency,
+                tokenAddress: address(test721)
+            });
+
+            for (uint256 batchIndex = 0; batchIndex < params.batchSize; batchIndex++) {
+                uint256 tokenId = run * params.batchSize + batchIndex + 1;
+
+                if ((tokenId - 1) % (3 * params.batchSize) == 0) {
+                    for (uint256 i = 0; i < (3 * params.batchSize); i++) {
+                        test721.mint(alice, tokenId + i);
+                        test721.setTokenRoyalty(tokenId + i, abe, params.royaltyFeeRate);
+                    }
+                }
+
+                fuzzedOrderInputsArray[batchIndex] = FuzzedOrder721({
+                    buyerIsContract: false,
+                    marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                    royaltyFeeRate: uint24(params.royaltyFeeRate),
+                    sellerKey: uint160(alicePk),
+                    expirationSeconds: 0, 
+                    buyerKey: 0,
+                    tokenId: tokenId,
+                    itemPrice: uint128(paymentAmount),
+                    beneficiary: params.beneficiary,
+                    cosignerKey: uint160(cosignerPk),
+                    marketplace: cal,
+                    royaltyReceiver: abe
+                });
+
+                saleDetailsArray[batchIndex] = Order({
+                    protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                    maker: alice,
+                    beneficiary: params.beneficiary,
+                    marketplace: cal,
+                    fallbackRoyaltyRecipient: address(0),
+                    paymentMethod: params.currency,
+                    tokenAddress: address(test721),
+                    tokenId: tokenId,
+                    amount: 1,
+                    itemPrice: paymentAmount,
+                    nonce: _getNextNonce(alice),
+                    expiration: type(uint48).max,
+                    marketplaceFeeNumerator: params.marketplaceFeeRate,
+                    maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                    requestedFillAmount: 1,
+                    minimumFillAmount: 1,
+                    protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+                });
+            }
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                if (params.emptyCosignature) {
+                    _sweepEmptyCosignedListingsAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                        sweepOrder,
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        EMPTY_SELECTOR);
+                } else {
+                    _sweepCosignedListingsAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                        sweepOrder,
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        EMPTY_SELECTOR);
+                }
+            } else {
+                if (params.emptyCosignature) {
+                    _sweepEmptyCosignedListingsWithFeeOnTopAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                        sweepOrder,
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                } else {
+                    _sweepCosignedListingsWithFeeOnTopAdvanced(
+                        channel,
+                        vm.addr(params.buyerKey), 
+                        params.currency == address(0) ? uint128(paymentAmount * params.batchSize) : 0, 
+                        sweepOrder,
+                        fuzzedOrderInputsArray, 
+                        saleDetailsArray, 
+                        feeOnTop,
+                        EMPTY_SELECTOR);
+                }
+            }
+        }
+    }
+
+    /***************************************/
+    /* Buy Listing Royalty Backfill  */
+    /***************************************/
+
+    function _runBenchmarkBuyListingRoyaltyBackfill(BenchmarkParams memory params) internal {
+
+        uint256 paymentAmount = 100 ether;
+
+        FeeOnTop memory feeOnTop = FeeOnTop({
+            amount: params.feeOnTopRate == type(uint96).max ? 0 : paymentAmount * params.feeOnTopRate / 100_00,
+            recipient: benchmarkFeeRecipient
+        });
+
+        if (feeOnTop.amount == 0) {
+            feeOnTop.recipient = address(0);
+        }
+    
+        for (uint256 tokenId = 1; tokenId <= params.numRuns; tokenId++) {
+            if ((tokenId - 1) % 3 == 0) {
+                for (uint256 i = 0; i < 3; i++) {
+                    test721Without2981.mint(alice, tokenId + i);
+                }
+            }
+
+            FuzzedOrder721 memory fuzzedOrderInputs = FuzzedOrder721({
+                buyerIsContract: false,
+                marketplaceFeeRate: uint24(params.marketplaceFeeRate),
+                royaltyFeeRate: uint24(params.royaltyFeeRate),
+                sellerKey: uint160(alicePk),
+                expirationSeconds: 0, 
+                buyerKey: 0,
+                tokenId: tokenId,
+                itemPrice: uint128(paymentAmount),
+                beneficiary: params.beneficiary,
+                cosignerKey: 0,
+                marketplace: cal,
+                royaltyReceiver: abe
+            });
+    
+            Order memory saleDetails = Order({
+                protocol: ORDER_PROTOCOLS_ERC721_FILL_OR_KILL,
+                maker: alice,
+                beneficiary: params.beneficiary,
+                marketplace: cal,
+                fallbackRoyaltyRecipient: address(0),
+                paymentMethod: params.currency,
+                tokenAddress: address(test721Without2981),
+                tokenId: tokenId,
+                amount: 1,
+                itemPrice: paymentAmount,
+                nonce: _getNextNonce(alice),
+                expiration: type(uint48).max,
+                marketplaceFeeNumerator: params.marketplaceFeeRate,
+                maxRoyaltyFeeNumerator: params.royaltyFeeRate,
+                requestedFillAmount: 1,
+                minimumFillAmount: 1,
+                protocolFeeVersion: _paymentProcessor.getProtocolFeeVersion()
+            });
+
+            if (params.feeOnTopRate == type(uint96).max) {
+                _buySignedListingAdvanced(
+                    channel,
+                    vm.addr(params.buyerKey), 
+                    params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    EMPTY_SELECTOR);
+            } else {
+                _buySignedListingWithFeeOnTopAdvanced(
+                    channel,
+                    vm.addr(params.buyerKey), 
+                    params.currency == address(0) ? uint128(saleDetails.itemPrice) : 0, 
+                    fuzzedOrderInputs, 
+                    saleDetails, 
+                    feeOnTop, 
+                    EMPTY_SELECTOR);
+            }
+        }
+    }
+}
